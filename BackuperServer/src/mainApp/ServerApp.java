@@ -8,12 +8,14 @@ package mainApp;
 import common.BackuperInterface;
 
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.rmi.*;
 import java.rmi.registry.LocateRegistry;
@@ -43,6 +45,10 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	
 	private Vector<Client> clients;
 	
+	private Md5Generator md5gen;
+	
+	private int port;
+	
 	public static void main(String[] args) {
 	        try {
 	        	System.setProperty("java.security.policy", "policy");
@@ -53,9 +59,21 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	    	
 	        try {
 	            ServerApp serverApp = new ServerApp();
-	            LocateRegistry.createRegistry(1099);
-	            Naming.rebind("BackuperServer", serverApp);
+	            serverApp.port = 1099;
+	            BufferedReader brIn = new BufferedReader(new InputStreamReader(System.in));
+	            System.out.println("Enter port:");
+	            String line = null;
+	            try {
+	            	line = brIn.readLine();
+	            	serverApp.port = Integer.parseInt(line);
+	            } catch (Exception e) {
+	            	serverApp.port = 1099;
+	            }
+	            System.out.println("Running server on port " + serverApp.port);
+	            LocateRegistry.createRegistry(serverApp.port);
+	            Naming.rebind("//localhost:"+serverApp.port+"/BackuperServer", serverApp);
 	        } catch (Exception e) {
+	        	e.printStackTrace();
 	            System.err.println(e.toString());
 	        }
 	    }
@@ -69,7 +87,21 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	}
 
 
-	public void uploadFile(String username, String fileName, long lastModified, String md5hex, RemoteInputStream remoteFileData) throws RemoteException {
+	public void uploadFile(String username, String fileName, long lastModified, RemoteInputStream remoteFileData) throws RemoteException {
+		//look for file with the same name in clients files
+		for (Client client : connectedClients) {
+			if (client.getUsername().equals(username)) {
+				for (File f : client.getClientFiles()) {
+					if (f.getName().equals(fileName)) {
+						int index = client.getClientFiles().indexOf(f);
+						client.getClientFiles().remove(index);
+						client.getClientFilesLastModified().remove(index);
+						client.getClientFilesMd5hex().remove(index);
+						break;
+					}
+				}
+			}
+		}
 		InputStream istream = null;
 		try {
 			istream = RemoteInputStreamClient.wrap(remoteFileData);
@@ -93,7 +125,24 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		        		client.getClientFiles().add(receivedFile);
 		        		int temp = client.getClientFiles().indexOf(receivedFile);
 		        	  	client.getClientFilesLastModified().add(temp, lastModified);
-		        	    client.getClientFilesMd5hex().add(temp, md5hex);
+		        	    client.getClientFilesMd5hex().add(temp, " ");
+		        	    if (md5gen == null) { // if thread wasn't created yet
+							System.out.println("Started calculating md5 for "+ receivedFile.getName());
+							md5gen = new Md5Generator(receivedFile.getAbsolutePath(), client.getUsername());
+							md5gen.addListener(this);
+							md5gen.start();
+							client.setIsCalculatingMd5(true);
+						} else if (!md5gen.isAlive()) { // if thread was created but it's not working
+							System.out.println("Started calculating md5 for "+ receivedFile.getName());
+							md5gen = new Md5Generator(receivedFile.getAbsolutePath(), client.getUsername());
+							md5gen.addListener(this);
+							md5gen.start();
+							client.setIsCalculatingMd5(true);
+						} else { //if thread is working
+							System.out.println("Calculating Md5 for " + receivedFile. getName() + " queued");
+							md5gen.addToQueue(receivedFile.getAbsolutePath());
+							client.setIsCalculatingMd5(true);
+						}
 		        	  	break;
 		        	 }
 		         }
@@ -150,12 +199,25 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	}
 
 	public String getFileMD5(String username, String fileName) throws RemoteException {
-		return null;
+		String temp = new String();
+		for (Client client : connectedClients) {
+			if (client.getUsername().equals(username)) {
+				if (!client.isCalculatingMd5()) {
+					int index = -1;
+					for (File f : client.getClientFiles()) {
+						if (f.getName().equals(fileName)) {
+							index = client.getClientFiles().indexOf(f);
+						}
+					}
+					if (index != -1) {
+						temp = client.getClientFilesMd5hex().get(index);
+					} else return null;
+				} else return null;
+			}
+		}
+		return temp;
 	}
 
-	public long getFileLastModified(String username, String fileName) throws RemoteException {
-		return 0;
-	}
 
 	public Vector<String> getListOfFilesOnServer(String username) throws RemoteException {
 		Vector<String> v = new Vector<String>();
@@ -171,10 +233,6 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	}
 
 	
-
-	/* (non-Javadoc)
-	 * @see common.BackuperInterface#logIn(java.lang.String, java.lang.String)
-	 */
 	@Override
 	public boolean logIn(String username, String password) throws RemoteException {
 		boolean temp = false;
@@ -193,10 +251,6 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		return temp;
 	}
 
-	/* (non-Javadoc)
-	 * @see common.BackuperInterface#register(java.lang.String, java.lang.String)
-	 */
-	@Override
 	public boolean register(String username, String password)
 			throws RemoteException {
 		clients.add(new Client(username, password));
@@ -209,9 +263,14 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	public void removeSelectedFile(String username, String fileName) throws RemoteException {
 		for (Client client : connectedClients) {
 			if (client.getUsername().equals(username)) {
+				System.out.println("username found");
 				for (File f : client.getClientFiles()) {
 					if (f.getName().equals(fileName)) {
+						System.out.println("file found");
+						client.getClientFilesLastModified().remove(client.getClientFiles().indexOf(f));
+						client.getClientFilesMd5hex().remove(client.getClientFiles().indexOf(f));
 						client.getClientFiles().remove(f);
+						if (f.delete()) System.out.println("file deleted");
 						break;
 					}
 				}
@@ -239,10 +298,6 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		writeSettings();
 	}
 
-	/* (non-Javadoc)
-	 * @see common.BackuperInterface#getMapOfFilesOnServer(java.lang.String)
-	 */
-	@Override
 	public HashMap<String, Long> getMapOfFilesOnServer(String username) throws RemoteException {
 		HashMap<String, Long> tempMap = new HashMap<String, Long>();
 		for (Client client : connectedClients) {
@@ -256,7 +311,6 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		writeSettings();
 		return tempMap;
 	}
-	
 	
 	private void readSettings() {
 		try {
@@ -281,12 +335,13 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				//		if (tempClient != null) clients.add(tempClient);
 					//	break;
 					} else {
-						// s looks like this: [file directory]___[file last modified parameter]
+						// s looks like this: [file directory]___[file last modified parameter]___[file md5]
 						try {
 						String[] str = s.split("___");
 						File f = new File(str[0]);
 						tempClient.getClientFiles().add(f);
 						tempClient.getClientFilesLastModified().add(Long.parseLong(str[1]));
+						tempClient.getClientFilesMd5hex().add(str[2]);
 						} catch (ArrayIndexOutOfBoundsException e) {
 						}
 					}
@@ -321,7 +376,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 			tempSettings.add("%%%" + c.getPassword());
 			if (!c.getClientFiles().isEmpty()) {
 				for (File file : c.getClientFiles()) {
-					tempSettings.add(file.getAbsolutePath() + "___" + c.getClientFilesLastModified().get(c.getClientFiles().indexOf(file)));
+					tempSettings.add(file.getAbsolutePath() + "___" + c.getClientFilesLastModified().get(c.getClientFiles().indexOf(file)) + "___" + c.getClientFilesMd5hex().elementAt(c.getClientFiles().indexOf(file)));
 				}
 			}
 		}
@@ -329,26 +384,22 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		
 		Writer w = new Writer(tempSettings);
 	}
-	@Override
-	public void notifyOfThreadComplete(Thread thread) {
-		/*	
+	
+	public void notifyOfThreadComplete(Thread thread) {		
 		if(thread instanceof Md5Generator) {
-			for (File f : selectedFiles) {
-				if (f.getAbsolutePath().equals(((Md5Generator) thread).getFilePath())) {
-					selectedFilesMd5.add(selectedFiles.indexOf(f), ((Md5Generator) thread).getMd5());
-					this.logController.addLine("Finished calculating md5 for file " + f.getName());
-					this.logController.addLine(((Md5Generator) thread).getMd5());
-					localTableModel.setValueAt(((Md5Generator) thread).getMd5(), selectedFiles.indexOf(f), 2);
-					repaint();
+			for (Client client : connectedClients) {
+				if (((Md5Generator) thread).getUsername().equals(client.getUsername())) {
+					for (File f : client.getClientFiles()) {
+						if (f.getAbsolutePath().equals(((Md5Generator) thread).getFilePath())) {
+							client.getClientFilesMd5hex().add(client.getClientFiles().indexOf(f), ((Md5Generator) thread).getMd5());
+							System.out.println("Finished calculating md5 for file " + f.getName());
+							System.out.println(((Md5Generator) thread).getMd5());
+							client.setIsCalculatingMd5(false);
+							}
+						}
+					break;
 					}
 				}
 			}
-		if (thread instanceof FileSender) {
-			updateFilesOnServerTable();
-			}
-		if (thread instanceof FileReceiver) {
-			logController.addLine("Finished writing files");
-		}
-		*/
 	}
 }

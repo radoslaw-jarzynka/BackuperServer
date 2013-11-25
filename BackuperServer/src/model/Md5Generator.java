@@ -18,11 +18,13 @@ public class Md5Generator extends NotifyingThread{
 	private FileInputStream fis;
 	private String md5;
 	private String filePath;
+	private String username;
 	
 	private volatile static LinkedBlockingQueue<String> queue = new LinkedBlockingQueue<String>();
 	
 	
-	public Md5Generator(String filePath) {
+	public Md5Generator(String filePath, String username) {
+		this.username = username;
 		this.filePath = filePath;
 	}
 	
@@ -41,7 +43,9 @@ public class Md5Generator extends NotifyingThread{
 	public void setFilePath(String s) {
 		filePath = s;
 	}
-	
+	public String getUsername() {
+		return username;
+	}
 	public void doRun() {
 		try {
 			fis = new FileInputStream(new File(filePath));

@@ -2,9 +2,9 @@
 <classpath>
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="/Users/radoslawjarzynka/Documents/workspace/BackuperInterface/commons-codec-1.8.jar"/>
-	<classpathentry kind="lib" path="/Users/radoslawjarzynka/Documents/workspace/BackuperInterface/rmiio-2.0.4.jar"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/BackuperInterface"/>
 	<classpathentry kind="lib" path="commons-logging-1.1.3.jar"/>
+	<classpathentry kind="lib" path="commons-codec-1.8.jar"/>
+	<classpathentry kind="lib" path="rmiio-2.0.4.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

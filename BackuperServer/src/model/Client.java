@@ -18,7 +18,11 @@ public class Client {
 	private Vector<Long> clientFilesLastModified;
 	private Vector<String> clientFilesMd5hex;
 	
+	private boolean isCalculatingMd5;
+	
 	public Client() {
+		
+		setIsCalculatingMd5(false);
 		username = new String();
 		password = new String();
 		
@@ -113,6 +117,20 @@ public class Client {
 	 */
 	public void setClientFilesMd5hex(Vector<String> clientFilesMd5hex) {
 		this.clientFilesMd5hex = clientFilesMd5hex;
+	}
+
+	/**
+	 * @return the isCalculatingMd5
+	 */
+	public boolean isCalculatingMd5() {
+		return isCalculatingMd5;
+	}
+
+	/**
+	 * @param isCalculatingMd5 the isCalculatingMd5 to set
+	 */
+	public void setIsCalculatingMd5(boolean isCalculatingMd5) {
+		this.isCalculatingMd5 = isCalculatingMd5;
 	}
 	
 }
