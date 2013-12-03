@@ -7,7 +7,7 @@ package utils;
 
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
-
+//nowy typ watku wysylajacy powiadomienie o zakonczeniu dzialania
 public abstract class NotifyingThread extends Thread {
 	  protected final Set<ThreadCompleteListener> listeners = new CopyOnWriteArraySet<ThreadCompleteListener>();
 	  public final void addListener(final ThreadCompleteListener listener) {

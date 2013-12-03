@@ -2,7 +2,7 @@ package utils;
 
 import java.util.Vector;
 import java.io.*;
-
+//klasa wczytujaca plik ustawien settings.txt (NIE czytajaca ze zrozumieniem, tyko wczytuje i zapisuje jako wektor stringow w pamieci)
 public class Reader {
 	
 	private Vector<String> inputFile;

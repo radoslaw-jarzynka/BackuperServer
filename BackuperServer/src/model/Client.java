@@ -8,18 +8,20 @@ package model;
 import java.io.File;
 import java.util.Vector;
 
+//klasa przedstawiajaca klienta
 public class Client {
 	
 	private String username;
 	private String password;
-	// file, lastModified,md5hex
 	//private Map<File, MapModel> clientFilesMap;
 	private Vector<File> clientFiles;
 	private Vector<Long> clientFilesLastModified;
 	private Vector<String> clientFilesMd5hex;
 	
+	//gdy watek w serwerze liczy md5 jakiegos pliku danego klienta ta wartosc jest ustawiana na true
 	private boolean isCalculatingMd5;
 	
+	//konstruktor bezargumentowy
 	public Client() {
 		
 		setIsCalculatingMd5(false);
@@ -31,6 +33,7 @@ public class Client {
 		clientFilesMd5hex = new Vector<String>();
 	}
 	
+	//konstruktor ustawiajacy nazwe uzytkownika i jego haslo
 	public Client(String username, String password) {
 		this.username = username;
 		this.password = password;
@@ -39,7 +42,7 @@ public class Client {
 		clientFilesLastModified = new Vector<Long>();
 		clientFilesMd5hex = new Vector<String>();
 	}
-	
+	//konstruktor kopiujacy
 	public Client(Client c) {
 		this.username = c.username;
 		this.password = c.password;
@@ -49,6 +52,10 @@ public class Client {
 		clientFilesMd5hex = c.getClientFilesMd5hex();
 	}
 
+	
+	//GETTERY I SETTERY
+	
+	
 	/**
 	 * @return the username
 	 */

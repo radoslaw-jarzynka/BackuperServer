@@ -35,6 +35,7 @@ import com.healthmarketscience.rmiio.RemoteInputStream;
 import com.healthmarketscience.rmiio.RemoteInputStreamClient;
 import com.healthmarketscience.rmiio.SimpleRemoteInputStream;
 
+//klasa serwera
 public class ServerApp extends UnicastRemoteObject implements BackuperInterface, ThreadCompleteListener {
 
 	private static final long serialVersionUID = 1L;
@@ -49,6 +50,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	
 	private int port;
 	
+	//glowna metoda
 	public static void main(String[] args) {
 	        try {
 	        	System.setProperty("java.security.policy", "policy");
@@ -73,11 +75,14 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 	            LocateRegistry.createRegistry(serverApp.port);
 	            Naming.rebind("//localhost:"+serverApp.port+"/BackuperServer", serverApp);
 	        } catch (Exception e) {
-	        	e.printStackTrace();
 	            System.err.println(e.toString());
+	            System.err.println("Something is wrong with chosen port. Please, try again");
+	            String [] x = new String[0];
+	            main(x);
 	        }
 	    }
-	
+	//konstruktor, ustala liczbę połączonych klientów na 0, tworzy wektory połączonych klientów
+	//i pozostałych klientów i wczytuje ustawienia z pliku settings.txt
 	public ServerApp() throws RemoteException {
 		super();		
 		numberOfConnectedClients = 0;
@@ -86,9 +91,9 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		readSettings();
 	}
 
-
+	//wgranie pliku na serwer
 	public void uploadFile(String username, String fileName, long lastModified, RemoteInputStream remoteFileData) throws RemoteException {
-		//look for file with the same name in clients files
+		//wyszukaj, czy klient posiada już taki plik
 		for (Client client : connectedClients) {
 			if (client.getUsername().equals(username)) {
 				for (File f : client.getClientFiles()) {
@@ -119,26 +124,26 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		        	ostream.write(buf, 0, bytesRead);
 		        }	
 		        ostream.flush();
-		         
+		        // liczenie funkcji skrótu md5
 		        for (Client client : connectedClients) {
 		        	if (client.getUsername().equals(username)) {
 		        		client.getClientFiles().add(receivedFile);
 		        		int temp = client.getClientFiles().indexOf(receivedFile);
 		        	  	client.getClientFilesLastModified().add(temp, lastModified);
 		        	    client.getClientFilesMd5hex().add(temp, " ");
-		        	    if (md5gen == null) { // if thread wasn't created yet
+		        	    if (md5gen == null) { // jeśli wątek nie został jeszcze utworzony
 							System.out.println("Started calculating md5 for "+ receivedFile.getName());
 							md5gen = new Md5Generator(receivedFile.getAbsolutePath(), client.getUsername());
 							md5gen.addListener(this);
 							md5gen.start();
 							client.setIsCalculatingMd5(true);
-						} else if (!md5gen.isAlive()) { // if thread was created but it's not working
+						} else if (!md5gen.isAlive()) { // jeśli wątek został utworzony, ale nie działa
 							System.out.println("Started calculating md5 for "+ receivedFile.getName());
 							md5gen = new Md5Generator(receivedFile.getAbsolutePath(), client.getUsername());
 							md5gen.addListener(this);
 							md5gen.start();
 							client.setIsCalculatingMd5(true);
-						} else { //if thread is working
+						} else { //jeśli wątek działa
 							System.out.println("Calculating Md5 for " + receivedFile. getName() + " queued");
 							md5gen.addToQueue(receivedFile.getAbsolutePath());
 							client.setIsCalculatingMd5(true);
@@ -168,13 +173,14 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		            }
 		          }
 		        }
+		    //zapisanie ustawien do pliku settings.txt
 		    writeSettings();
 		}
-
+	//pobranie pliku z serwera
 	public RemoteInputStream getFile(String username, String fileName) throws RemoteException {
 		
 		SimpleRemoteInputStream istream = null;
-		
+		//poszukaj, czy klient ma taki plik
 		for (Client client : connectedClients) {
 			if (client.getUsername().equals(username)) {
 				for (File f : client.getClientFiles()) {
@@ -194,10 +200,11 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				}
 			}
 		}
+		//zapisanie ustawien do settings.txt
 		writeSettings();
 		return istream;
 	}
-
+	//pobranie hashu md5 danego pliku
 	public String getFileMD5(String username, String fileName) throws RemoteException {
 		String temp = new String();
 		for (Client client : connectedClients) {
@@ -218,7 +225,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		return temp;
 	}
 
-
+	//pobiera liste nazw plikow na serwerze
 	public Vector<String> getListOfFilesOnServer(String username) throws RemoteException {
 		Vector<String> v = new Vector<String>();
 		for (Client client : connectedClients) {
@@ -228,17 +235,19 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				}
 			}
 		}
+		//zapisanie ustawien
 		writeSettings();
 		return v;
 	}
 
-	
+	//zalogowanie sie na serwer
 	@Override
 	public boolean logIn(String username, String password) throws RemoteException {
 		boolean temp = false;
 		for (Client client : clients) {
 			if (client.getUsername().equals(username)) {
 				if (client.getPassword().equals(password)) {
+					//kopiuje klienta z wektora Clients do connectedClients
 					connectedClients.add(client);
 					numberOfConnectedClients++;
 					temp = true;
@@ -250,16 +259,17 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		writeSettings();
 		return temp;
 	}
-
+	//rejestracja nowego uzytkownika
 	public boolean register(String username, String password)
 			throws RemoteException {
 		clients.add(new Client(username, password));
+		//tworzenie folderu uzytkownika i zapisanie ustawien
 		File dir = new File(username);
 		dir.mkdir();
 		writeSettings();
 		return true;
 	}
-	
+	//usuniecie danego pliku z serwera
 	public void removeSelectedFile(String username, String fileName) throws RemoteException {
 		for (Client client : connectedClients) {
 			if (client.getUsername().equals(username)) {
@@ -276,12 +286,13 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				}
 			}
 		}
+		//zapisanie ustawien
 		writeSettings();
 	}
 	
 	public void disconnect(String username) throws RemoteException {
 	
-		//find connected client with given username, find client with given username, replace client with connected client and remove connected client from list
+		//szuka connectedClienta z danym imieniem i Clienta z danym imieniem, usuwa wpis w Clients i zastępuje go tym z connectedClients
 		
 		for (Client connectedClient : connectedClients) {
 			if (connectedClient.getUsername().equals(username)) {
@@ -298,6 +309,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		writeSettings();
 	}
 
+	//zwraca mapę plików na serwerze w postaci <nazwaPliku, lastModified>
 	public HashMap<String, Long> getMapOfFilesOnServer(String username) throws RemoteException {
 		HashMap<String, Long> tempMap = new HashMap<String, Long>();
 		for (Client client : connectedClients) {
@@ -308,16 +320,18 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				break;
 			}
 		}
+		//zapisanie ustawien
 		writeSettings();
 		return tempMap;
 	}
 	
+	//wczytanie ustawien z serwera
 	private void readSettings() {
 		try {
-			//Load configuration file
+			//zaladowanie pliku konfiguracyjnego
 			Reader reader = new Reader("settings.txt");
 			
-			// read configuration file
+			//czytanie ustawien
 			if (reader.getInputFile()!=null) {
 				String tempUsername;
 				String tempPassword;
@@ -335,7 +349,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 				//		if (tempClient != null) clients.add(tempClient);
 					//	break;
 					} else {
-						// s looks like this: [file directory]___[file last modified parameter]___[file md5]
+						// s wyglada tak: [sciezka dostepu do pliku]___[last modified pliku]___[md5 pliku]
 						try {
 						String[] str = s.split("___");
 						File f = new File(str[0]);
@@ -353,6 +367,7 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		}
 	}
 	
+	//zapisanie ustawien
 	private void writeSettings() {
 		Vector<Client> tempClients = new Vector<Client>();
 		for (Client c : clients) {
@@ -385,7 +400,9 @@ public class ServerApp extends UnicastRemoteObject implements BackuperInterface,
 		Writer w = new Writer(tempSettings);
 	}
 	
+	//funkcja wywolywana po tym, jak watek powiadomi listener ze skonczyl dzialanie
 	public void notifyOfThreadComplete(Thread thread) {		
+		//przypisanie md5 do danego pliku
 		if(thread instanceof Md5Generator) {
 			for (Client client : connectedClients) {
 				if (((Md5Generator) thread).getUsername().equals(client.getUsername())) {

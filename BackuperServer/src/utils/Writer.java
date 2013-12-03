@@ -10,6 +10,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Vector;
 
+//klasa zapisujaca do pliku settings.txt dany jej wektor stringow
 public class Writer {
 	
 	private File file = new File("settings.txt");
